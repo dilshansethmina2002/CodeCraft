@@ -91,7 +91,7 @@ export default function Hero() {
 
       {/* === MAIN TYPOGRAPHY === */}
       <div className="flex flex-col items-center justify-center z-10 w-full">
-       <p className="welcome-text text-transparent bg-clip-text bg-gradient-to-r from-zinc-600 via-zinc-300 to-zinc-600 text-lg md:text-lg mb-6 tracking-[0.6em] uppercase font-medium">
+       <p className="welcome-text text-transparent bg-clip-text bg-gradient-to-r from-zinc-600 via-zinc-300 to-zinc-600 text-lg md:text-l mb-6 tracking-[0.6em] uppercase font-medium">
           Welcome To
         </p>
         
