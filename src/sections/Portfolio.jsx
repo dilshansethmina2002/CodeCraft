@@ -2,9 +2,44 @@ import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
-import { projects } from '../data/project';
 
 gsap.registerPlugin(ScrollTrigger);
+
+// Project Data
+const projects = [
+  {
+    id: 1,
+    title: "Athukorala Group Unified Management System",
+    category: "Enterprise ERP",
+    image: "/projects/unified.png", // Replace with your actual image path
+    shortDescription: "A comprehensive digital management system digitizing operations across multiple factory departments with real-time analytics.",
+    longDescription: "An end-to-end enterprise management solution designed to digitize and streamline operations across the Handmade, Packing, Factory, Manufacturing, and Local Sale sections. The system eliminates paper-based bottlenecks and introduces live data tracking for floor management performance, seamlessly integrating automated TC5 regulatory reporting.",
+    features: [
+      "Real-time operational dashboards using Socket.io",
+      "Automated TC5 regulatory report generation",
+      "Multi-departmental data synchronization",
+      "Role-based access control and performance tracking"
+    ],
+    tags: ["MongoDB", "Express.js", "React", "Node.js", "Socket.io", "Tailwind CSS"],
+    link: "#"
+  },
+  {
+    id: 2,
+    title: "DK Garage Management System",
+    category: "Business Operations",
+    image: "/projects/DK.png", // Replace with your actual image path
+    shortDescription: "A robust service and inventory management platform tailored for automotive garage workflows.",
+    longDescription: "A dedicated management system built to handle the day-to-day operations of an automotive garage. It provides a centralized hub for tracking vehicle repair statuses, managing spare parts inventory, scheduling appointments, and generating automated billing invoices, ensuring a frictionless experience for both mechanics and customers.",
+    features: [
+      "Live vehicle service status tracking",
+      "Automated inventory management and low-stock alerts",
+      "Integrated billing and invoice generation",
+      "Customer history and appointment scheduling"
+    ],
+    tags: ["MongoDB", "Express.js", "React", "Node.js", "Tailwind CSS"],
+    link: "#"
+  }
+];
 
 export default function Portfolio() {
   const [selectedProject, setSelectedProject] = useState(null);
@@ -78,7 +113,7 @@ export default function Portfolio() {
         </div>
 
         {/* Project Grid */}
-        <div ref={gridRef} className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div ref={gridRef} className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {projects.map((project) => (
             <div
               key={project.id}
@@ -118,6 +153,11 @@ export default function Portfolio() {
                       {tag}
                     </span>
                   ))}
+                  {project.tags.length > 3 && (
+                    <span className="text-xs bg-gray-50 text-gray-600 px-3 py-1 rounded-full border border-gray-100">
+                      +{project.tags.length - 3}
+                    </span>
+                  )}
                 </div>
 
                 {/* View Details Hint */}

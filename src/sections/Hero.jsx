@@ -2,176 +2,280 @@ import React, { useRef } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
+/*
+  Palette (a house at golden hour)
+  paper #EDF0F6  ink #12162B  slate #6B7390  cobalt #2B3AF7 (buttons)
+  walls #F3E9D6  roof #B9503A  brick #A8503A  door #7B4B2A  lawn #8CC063  glass #6EA6CC  lamp #F5C259
+  Type: Bricolage Grotesque
+*/
+
+const FONT_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&display=swap');
+.craft-hero { font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; }
+.craft-display { font-variation-settings: 'wdth' 75, 'opsz' 96; font-weight: 800; }
+`;
+
+const HEADLINE = ['Build with', 'intention.'];
+
+/* ---------- 3D helpers ----------
+   Scene units are px on a 420 x 420 lawn. x = right, y = toward the viewer, z = up.
+   The sun sits front-right, so each face of a box gets its own darkness. */
+const SHADE = { top: 0, front: 0.05, right: 0.12, back: 0.3, left: 0.26 };
+
+function Block({ b, innerRef }) {
+  const { x, y, w, d, h, z0 = 0, color, side, top } = b;
+  const face = (kind, pattern) => ({
+    backgroundColor: color,
+    backgroundImage: pattern || undefined,
+    boxShadow: `inset 0 0 0 999px rgba(0,0,0,${SHADE[kind]})`,
+  });
+  const z = `translateZ(${z0}px)`;
+  return (
+    <div ref={innerRef} className="absolute" style={{ left: x, top: y, width: w, height: d, transformStyle: 'preserve-3d' }}>
+      <div className="absolute" style={{ ...face('top', top), left: 0, top: 0, width: w, height: d, transform: `translateZ(${z0 + h}px)` }} />
+      <div className="absolute" style={{ ...face('front', side), left: 0, top: d, width: w, height: h, transformOrigin: '0 0', transform: `${z} rotateX(90deg)` }} />
+      <div className="absolute" style={{ ...face('back', side), left: 0, top: 0, width: w, height: h, transformOrigin: '0 0', transform: `${z} rotateX(90deg)` }} />
+      <div className="absolute" style={{ ...face('right', side), left: w, top: 0, width: h, height: d, transformOrigin: '0 0', transform: `${z} rotateY(-90deg)` }} />
+      <div className="absolute" style={{ ...face('left', side), left: 0, top: 0, width: h, height: d, transformOrigin: '0 0', transform: `${z} rotateY(-90deg)` }} />
+    </div>
+  );
+}
+
+const Group = React.forwardRef(({ children }, ref) => (
+  <div ref={ref} className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+    {children}
+  </div>
+));
+
+// Upright decal on the front wall (faces the viewer).
+const FrontDecal = ({ x, w, h, z0, children, className = '' }) => (
+  <div
+    className={`absolute ${className}`}
+    style={{ left: x, top: 300.5, width: w, height: h, transformOrigin: '0 0', transform: `translateZ(${z0 + h}px) rotateX(-90deg)` }}
+  >
+    {children}
+  </div>
+);
+
+const MULLION = 'linear-gradient(#fff,#fff) center/100% 4px no-repeat, linear-gradient(#fff,#fff) center/4px 100% no-repeat';
+const Glass = () => (
+  <div
+    className="absolute inset-0 rounded-[3px] border-[4px] border-white shadow-[0_3px_8px_rgba(60,40,20,0.3)]"
+    style={{ backgroundImage: `${MULLION}, linear-gradient(160deg,#C4E6F7,#6EA6CC)` }}
+  >
+    {/* the lamp behind the glass: switches on at the end of the build */}
+    <div
+      className="craft-lamp absolute inset-0"
+      style={{
+        opacity: 0.85,
+        backgroundImage: `${MULLION}, radial-gradient(circle at 50% 65%, #FFF1BE, #F5C259 75%)`,
+        boxShadow: '0 0 26px 6px rgba(255,208,110,0.55)',
+      }}
+    />
+  </div>
+);
+
+/* ---------- Scene data ---------- */
+const WALL = '#F3E9D6';
+const ROOF_LINES = 'repeating-linear-gradient(to bottom, transparent 0 11px, rgba(0,0,0,0.2) 11px 12px)';
+const BRICK = 'repeating-linear-gradient(to bottom, transparent 0 7px, rgba(0,0,0,0.28) 7px 8px)';
+
+const TREES = [
+  { x: 28, y: 330 },
+  { x: 352, y: 40 },
+  { x: 346, y: 318 },
+];
+const LIFT = [0, 0, 110, 110, 18, 18, 18]; // body, details, roof, chimney, 3 trees (hover lift)
+
 export default function CraftingHero() {
-  const containerRef = useRef(null);
+  const rootRef = useRef(null);
+  const tiltRef = useRef(null);
+  const floatRef = useRef(null);
+  const shadowRef = useRef(null);
+  const sunRef = useRef(null);
+  const groupRefs = useRef([]);
+  const reduced = useRef(false);
 
-  // Refs for the 3D Gyroscope elements
-  const gyroContainerRef = useRef(null);
-  const ring1Ref = useRef(null);
-  const ring2Ref = useRef(null);
-  const ring3Ref = useRef(null);
-  const coreRef = useRef(null);
-  const particlesRef = useRef(null);
+  const { contextSafe } = useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      const groups = groupRefs.current;
 
-  useGSAP(() => {
-    // 1. Float the entire gyroscope assembly up and down
-    gsap.to(gyroContainerRef.current, {
-      y: -30,
-      duration: 4,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut"
-    });
+      gsap.set(tiltRef.current, { rotationX: 60, rotationZ: 0 , rotationY: 10});
+      gsap.set(shadowRef.current, { z: -40 });
 
-    // 2. Rotate Outer Ring (Slow, X & Y axes)
-    gsap.to(ring1Ref.current, {
-      rotationX: 360,
-      rotationY: 180,
-      duration: 25,
-      repeat: -1,
-      ease: "none"
-    });
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        reduced.current = false;
 
-    // 3. Rotate Middle Ring (Reverse direction, different axes)
-    gsap.to(ring2Ref.current, {
-      rotationX: -180,
-      rotationY: -360,
-      duration: 20,
-      repeat: -1,
-      ease: "none"
-    });
+        // One orchestrated moment: the plot is marked, the house goes up piece by piece,
+        // then the windows light up while the headline sets itself.
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.from(tiltRef.current, { rotationZ: -130, duration: 2.8 }, 0)
+          .from('.craft-wire', { scale: 0.6, opacity: 0, transformOrigin: '50% 50%', duration: 0.7, stagger: 0.08 }, 0.2)
+          .from(groups, { z: 650, duration: 1.1, stagger: 0.2, ease: 'power4.out' }, 0.8)
+          .from('.craft-lamp', { opacity: 0, duration: 1.2, stagger: 0.15, ease: 'sine.out' }, 2.6)
+          .from('.craft-char', { yPercent: 115, rotate: 5, duration: 1.1, stagger: 0.035, ease: 'power4.out' }, 0.2)
+          .from('.craft-fade', { opacity: 0, y: 14, duration: 0.8, stagger: 0.1 }, 1.0);
 
-    // 4. Rotate Inner Ring (Fastest, Z & Y axes)
-    gsap.to(ring3Ref.current, {
-      rotationY: 360,
-      rotationZ: 360,
-      duration: 15,
-      repeat: -1,
-      ease: "none"
-    });
+        // Idle: the house breathes, the sun and the windows glow softly.
+        gsap.to(floatRef.current, { y: -12, duration: 3.8, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+        gsap.to(sunRef.current, { scale: 1.12, opacity: 0.85, duration: 3, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+        gsap.to('.craft-lamp', { opacity: 0.6, duration: 2.4, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 4 });
+      });
 
-    // 5. Pulsate the Center Core
-    gsap.to(coreRef.current, {
-      scale: 1.3,
-      opacity: 0.7,
-      boxShadow: '0 0 60px rgba(139, 92, 246, 0.8)',
-      duration: 2,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut"
-    });
+      mm.add('(prefers-reduced-motion: reduce)', () => {
+        reduced.current = true;
+      });
 
-    // 6. Slowly rotate the background ambient particles
-    gsap.to(particlesRef.current, {
-      rotationZ: 360,
-      duration: 40,
-      repeat: -1,
-      ease: "none"
-    });
+      return () => mm.revert();
+    },
+    { scope: rootRef }
+  );
 
-  }, { scope: containerRef });
+  const onMove = contextSafe((e) => {
+    if (reduced.current) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const nx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+    const ny = ((e.clientY - r.top) / r.height - 0.5) * 2;
+    gsap.to(tiltRef.current, { rotationX: 58 - ny * 9, rotationZ: -38 + nx * 14, duration: 0.9, ease: 'power3.out', overwrite: 'auto' });
+  });
+
+  // Hover lifts the roof and chimney off the house.
+  const spread = contextSafe((open) => {
+    if (reduced.current) return;
+    gsap.to(groupRefs.current, { z: (i) => (open ? LIFT[i] : 0), duration: 0.9, ease: 'power3.out', overwrite: 'auto' });
+    gsap.to(shadowRef.current, { scale: open ? 1.2 : 1, opacity: open ? 0.6 : 1, duration: 1, ease: 'power3.out' });
+    if (!open) gsap.to(tiltRef.current, { rotationX: 58, rotationZ: -38, duration: 1.1, ease: 'power3.out', overwrite: 'auto' });
+  });
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#fafafa] text-gray-900 font-sans selection:bg-indigo-200 pt-24 overflow-hidden">
-      <main className="max-w-[1400px] mx-auto px-8 md:px-12 pt-12 lg:pt-16 pb-20 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center h-full">
+    <div ref={rootRef} className="craft-hero relative min-h-screen overflow-hidden bg-[#EDF0F6] text-[#12162B] selection:bg-[#2B3AF7] selection:text-white">
+      <style>{FONT_CSS}</style>
 
-        {/* Left Content - The Meaning of Crafting */}
-        <div className="max-w-xl z-10 relative">
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-sm font-semibold tracking-wide">
-            <span>crafting</span>
-            <span className="text-indigo-400 font-normal">/ˈkraftiNG/</span>
-          </div>
-
-          <h1 className="text-5xl md:text-6xl lg:text-[64px] font-extrabold tracking-tight leading-[1.1] mb-6">
-            The art of <span className="relative inline-block text-indigo-600">
-              building
-              <svg className="absolute w-full h-3 -bottom-1 left-0 text-indigo-200" viewBox="0 0 100 20" preserveAspectRatio="none">
-                <path d="M0,10 Q50,20 100,5" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
-              </svg>
-            </span> with intention.
+      <main className="mx-auto grid min-h-screen max-w-[1440px] grid-cols-1 items-center gap-6 px-6 py-20 md:px-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-4">
+        {/* Copy */}
+        <section className="relative z-10">
+          <h1 aria-label={HEADLINE.join(' ')} className="craft-display mb-8 text-[clamp(3.6rem,10.5vw,9.5rem)] leading-[0.86] tracking-[-0.035em]">
+            {HEADLINE.map((line) => (
+              <span key={line} aria-hidden="true" className="-mb-[0.06em] block overflow-hidden pb-[0.1em]">
+                {[...line].map((ch, i) => (
+                  <span key={i} className="craft-char inline-block will-change-transform">
+                    {ch === ' ' ? '\u00A0' : ch}
+                  </span>
+                ))}
+              </span>
+            ))}
           </h1>
 
-          <p className="text-lg text-gray-600 mb-10 leading-relaxed max-w-[460px]">
-            To craft is to exercise skill and careful attention to detail. We provide the digital anvil and tools necessary to shape your raw ideas into powerful, beautiful digital experiences.
+          <p className="craft-fade mb-10 max-w-[30rem] text-lg leading-relaxed text-[#6B7390] md:text-xl">
+            Craft is care at the level of detail. Sketch it, shape it and ship it with tools that stay out of your way.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-16">
-            <button className="px-8 py-4 bg-gray-900 hover:bg-black text-white font-semibold rounded-xl transition-all shadow-lg shadow-gray-900/20 flex items-center gap-2">
-              Start Crafting
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
+          <div className="craft-fade mb-14 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button className="rounded-full bg-[#2B3AF7] px-8 py-4 font-semibold text-white shadow-[0_10px_30px_-8px_rgba(43,58,247,0.6)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#12162B]">
+              Start crafting
             </button>
-            <button className="px-8 py-4 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 font-semibold rounded-xl transition-all flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              See it in action
+            <button className="rounded-full border border-[#12162B]/20 px-8 py-4 font-semibold transition-colors duration-200 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#12162B]">
+              Watch a build
             </button>
           </div>
 
-          <div className="flex items-center gap-10 border-t border-gray-200 pt-8">
-            <div>
-              <div className="text-3xl font-bold tracking-tight mb-1 text-gray-900">Pixel</div>
-              <div className="text-sm text-gray-500 font-medium">Perfect Precision</div>
-            </div>
-            <div className="w-px h-12 bg-gray-200"></div>
-            <div>
-              <div className="text-3xl font-bold tracking-tight mb-1 text-gray-900">∞</div>
-              <div className="text-sm text-gray-500 font-medium">Endless Possibilities</div>
+          <p className="craft-fade max-w-[26rem] border-l-2 border-[#E0A53A] pl-4 text-sm leading-relaxed text-[#6B7390]">
+            <span className="font-semibold text-[#12162B]">craft</span> (verb) to make something with skill and close attention to detail.
+          </p>
+        </section>
+
+        {/* The 3D house */}
+        <section
+          className="relative flex h-[480px] items-center justify-center bg-[radial-gradient(ellipse_at_85%_8%,rgba(255,232,160,0.6),transparent_60%)] sm:h-[640px]"
+          onPointerMove={onMove}
+          onPointerEnter={() => spread(true)}
+          onPointerLeave={() => spread(false)}
+          aria-label="A 3D model of a house, built piece by piece, with warm light in the windows"
+        >
+          {/* The sun */}
+          <div ref={sunRef} className="pointer-events-none absolute right-4 top-2 h-40 w-40 rounded-full bg-[radial-gradient(circle,#FFF6CF_0%,rgba(255,226,140,0.7)_35%,transparent_70%)] blur-[2px] sm:right-10 sm:top-6 sm:h-52 sm:w-52" />
+
+          <div className="scale-[0.62] sm:-translate-y-4 sm:scale-[0.92]" style={{ perspective: '2000px' }}>
+            <div ref={floatRef} style={{ transformStyle: 'preserve-3d' }}>
+              <div ref={tiltRef} className="relative h-[420px] w-[420px]" style={{ transformStyle: 'preserve-3d' }}>
+                <div ref={shadowRef} className="absolute inset-[-8%] rounded-[2rem] bg-[#3B2A14]/30 blur-2xl" />
+
+                {/* Lawn: soil edge, mown stripes, sunlight from the front right */}
+                <div className="absolute inset-0 rounded-3xl bg-[#6E5233]" style={{ transform: 'translateZ(-12px)' }} />
+                <div
+                  className="absolute inset-0 rounded-3xl"
+                  style={{
+                    backgroundColor: '#8CC063',
+                    backgroundImage:
+                      'radial-gradient(circle at 85% 90%, rgba(255,250,200,0.45), transparent 55%), repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 30px, transparent 30px 60px)',
+                    boxShadow: 'inset 0 0 0 3px rgba(60,100,40,0.35)',
+                  }}
+                />
+                {/* Soft shadow the house throws on the lawn (away from the sun) */}
+                <div className="absolute rounded-lg bg-[#1E3A12]/35 blur-xl" style={{ left: 56, top: 80, width: 260, height: 200, transform: 'translateZ(1px)' }} />
+                {/* Path to the door */}
+                <div className="absolute rounded-md bg-[#E2D7BE]" style={{ left: 196, top: 322, width: 38, height: 98, transform: 'translateZ(1px)' }} />
+
+                {/* Plot marking */}
+                <div className="craft-wire absolute rounded-sm border-[1.5px] border-dashed border-[#2F5A1E]/70" style={{ left: 78, top: 108, width: 264, height: 204, transform: 'translateZ(2px)' }} />
+
+                {/* 0 Walls */}
+                <Group ref={(el) => (groupRefs.current[0] = el)}>
+                  <Block b={{ x: 86, y: 116, w: 248, d: 188, h: 10, color: '#A39B8B' }} />
+                  <Block b={{ x: 90, y: 120, w: 240, d: 180, h: 110, color: WALL, top: undefined }} />
+                </Group>
+
+                {/* 1 Door, windows, porch, hedges */}
+                <Group ref={(el) => (groupRefs.current[1] = el)}>
+                  <Block b={{ x: 182, y: 300, w: 66, d: 24, h: 6, color: '#CFC8B8' }} />
+                  <Block b={{ x: 106, y: 304, w: 64, d: 20, h: 22, color: '#4E8F3E' }} />
+                  <Block b={{ x: 264, y: 304, w: 60, d: 20, h: 22, color: '#4E8F3E' }} />
+                  <FrontDecal x={110} w={50} h={46} z0={46}><Glass /></FrontDecal>
+                  <FrontDecal x={270} w={50} h={46} z0={46}><Glass /></FrontDecal>
+                  <FrontDecal x={190} w={50} h={76} z0={6}>
+                    <div
+                      className="absolute inset-0 rounded-t-md border-[3px] border-[#F8F3E8] bg-[#7B4B2A] shadow-[0_3px_8px_rgba(60,40,20,0.35)]"
+                      style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)) 50% 12%/62% 34% no-repeat, linear-gradient(rgba(0,0,0,.2),rgba(0,0,0,.2)) 50% 82%/62% 34% no-repeat' }}
+                    >
+                      <span className="absolute right-2 top-1/2 h-2 w-2 rounded-full bg-[#F3D58A]" />
+                    </div>
+                  </FrontDecal>
+                  {/* window on the left wall */}
+                  <div
+                    className="absolute"
+                    style={{ left: 89.5, top: 170, width: 46, height: 50, transformOrigin: '0 0', transform: `translateZ(${46 + 46}px) rotateY(90deg)` }}
+                  >
+                    <Glass />
+                  </div>
+                </Group>
+
+                {/* 2 Roof: two slopes and two gables */}
+                <Group ref={(el) => (groupRefs.current[2] = el)}>
+                  <div className="absolute" style={{ left: 76, top: 314, width: 268, height: 139, transformOrigin: '0 0', transform: 'translateZ(98px) rotateX(138.5deg)', backgroundColor: '#C2573F', backgroundImage: ROOF_LINES, boxShadow: 'inset 0 0 0 2px rgba(0,0,0,0.12)' }} />
+                  <div className="absolute" style={{ left: 76, top: 106, width: 268, height: 139, transformOrigin: '0 0', transform: 'translateZ(98px) rotateX(41.5deg)', backgroundColor: '#8F3F2E', backgroundImage: ROOF_LINES, boxShadow: 'inset 0 0 0 2px rgba(0,0,0,0.12)' }} />
+                  <div className="absolute" style={{ left: 90, top: 120, width: 80, height: 180, transformOrigin: '0 0', transform: 'translateZ(110px) rotateY(-90deg)', backgroundColor: '#D6C8AC', clipPath: 'polygon(0 0, 0 100%, 100% 50%)' }} />
+                  <div className="absolute" style={{ left: 330, top: 120, width: 80, height: 180, transformOrigin: '0 0', transform: 'translateZ(110px) rotateY(-90deg)', backgroundColor: '#E9DEC8', clipPath: 'polygon(0 0, 0 100%, 100% 50%)' }} />
+                </Group>
+
+                {/* 3 Chimney */}
+                <Group ref={(el) => (groupRefs.current[3] = el)}>
+                  <Block b={{ x: 276, y: 192, w: 28, d: 28, h: 102, z0: 118, color: '#A8503A', side: BRICK }} />
+                  <Block b={{ x: 273, y: 189, w: 34, d: 34, h: 6, z0: 214, color: '#4A4540' }} />
+                </Group>
+
+                {/* 4-6 Trees */}
+                {TREES.map((t, i) => (
+                  <Group key={i} ref={(el) => (groupRefs.current[4 + i] = el)}>
+                    <Block b={{ x: t.x + 16, y: t.y + 16, w: 12, d: 12, h: 34, color: '#6B4A2E' }} />
+                    <Block b={{ x: t.x, y: t.y, w: 44, d: 44, h: 30, z0: 28, color: '#4E8F3E' }} />
+                    <Block b={{ x: t.x + 8, y: t.y + 8, w: 28, d: 28, h: 26, z0: 56, color: '#66AE4F' }} />
+                  </Group>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Right Content - 3D Digital Gyroscope Visual */}
-        <div className="relative h-[600px] w-full hidden lg:flex items-center justify-center perspective-[1000px] z-0">
-
-          {/* Ambient Background Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-400/10 blur-[120px] rounded-full pointer-events-none"></div>
-
-          {/* Ambient Orbital Particles */}
-          <div ref={particlesRef} className="absolute inset-0 pointer-events-none">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-2 h-2 bg-indigo-400 rounded-full blur-[1px]"
-                style={{
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  opacity: Math.random() * 0.5 + 0.2
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Main 3D Gyroscope Assembly */}
-          <div ref={gyroContainerRef} className="relative w-[400px] h-[400px] flex items-center justify-center" style={{ transformStyle: 'preserve-3d' }}>
-
-            {/* Outer Ring (Largest) */}
-            <div ref={ring1Ref} className="absolute w-[360px] h-[360px] rounded-full border border-indigo-200/40 bg-white/5 backdrop-blur-sm" style={{ transformStyle: 'preserve-3d' }}>
-              <div className="absolute -top-1.5 left-1/2 w-3 h-3 bg-indigo-400 rounded-full -translate-x-1/2 shadow-[0_0_10px_#818cf8]"></div>
-              <div className="absolute -bottom-1.5 left-1/2 w-3 h-3 bg-indigo-400 rounded-full -translate-x-1/2 shadow-[0_0_10px_#818cf8]"></div>
-            </div>
-
-            {/* Middle Ring (Medium) */}
-            <div ref={ring2Ref} className="absolute w-[260px] h-[260px] rounded-full border-2 border-dashed border-indigo-400/30" style={{ transformStyle: 'preserve-3d' }}>
-              <div className="absolute top-1/2 -left-2 w-4 h-4 border-2 border-indigo-400 bg-white rounded-full -translate-y-1/2"></div>
-              <div className="absolute top-1/2 -right-2 w-4 h-4 border-2 border-indigo-400 bg-white rounded-full -translate-y-1/2"></div>
-            </div>
-
-            {/* Inner Ring (Smallest, thicker glass) */}
-            <div ref={ring3Ref} className="absolute w-[160px] h-[160px] rounded-full border-[8px] border-white/60 bg-indigo-100/20 backdrop-blur-md shadow-[0_0_30px_rgba(99,102,241,0.2)]" style={{ transformStyle: 'preserve-3d' }}>
-            </div>
-
-            {/* The Center Energy Core */}
-            <div ref={coreRef} className="absolute w-[50px] h-[50px] rounded-full bg-gradient-to-tr from-indigo-600 via-purple-500 to-fuchsia-400 shadow-[0_0_40px_rgba(139,92,246,0.5)] border-2 border-white/80" style={{ transformStyle: 'preserve-3d' }}>
-              {/* Core inner highlight */}
-              <div className="absolute inset-1 rounded-full bg-white/30 backdrop-blur-sm"></div>
-            </div>
-
-          </div>
-        </div>
+        </section>
       </main>
     </div>
   );
