@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
 import { projects } from '../data/project';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Portfolio() {
   const [selectedProject, setSelectedProject] = useState(null);
+  const sectionRef = useRef(null);
+  const headerRef = useRef(null);
+  const gridRef = useRef(null);
 
+  // Handle body scroll lock for modal
   useEffect(() => {
     if (selectedProject) {
       document.body.style.overflow = 'hidden';
@@ -13,60 +22,107 @@ export default function Portfolio() {
     return () => { document.body.style.overflow = 'unset'; };
   }, [selectedProject]);
 
+  // GSAP Scroll Animations
+  useGSAP(() => {
+    // Animate Header Elements
+    gsap.fromTo(headerRef.current.children,
+      { y: 40, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 1,
+        stagger: 0.15,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top 85%',
+          once: true
+        }
+      }
+    );
+
+    // Staggered Cards Reveal
+    gsap.fromTo('.portfolio-card',
+      { y: 60, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 1,
+        stagger: 0.1,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: gridRef.current,
+          start: 'top 90%',
+          once: true
+        }
+      }
+    );
+  }, { scope: sectionRef });
+
   return (
-    <section id="portfolio" className="py-24 bg-slate-950 relative">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+    <section id="portfolio" ref={sectionRef} className="py-24 bg-[#fafafa] relative z-10 font-sans">
+      <div className="max-w-[1400px] mx-auto px-8 md:px-12">
+
         {/* Header */}
-        <div className="mb-16 text-center sm:text-left">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white">Our Featured Works</h2>
-          <p className="text-neutral-400 max-w-xl">
-            Click on any project to explore the architecture, features, and technologies we used to bring it to life.
+        <div ref={headerRef} className="flex flex-col items-center text-center mb-20">
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-sm font-semibold tracking-wide">
+            <span>showcase</span>
+            <span className="text-indigo-400 font-normal">/ gallery</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6 tracking-tight">
+            Our Featured Works
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed">
+            Click on any project to explore the architecture, features, and technologies we used to shape raw ideas into powerful digital experiences.
           </p>
         </div>
 
         {/* Project Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div ref={gridRef} className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {projects.map((project) => (
-            <div 
-              key={project.id} 
+            <div
+              key={project.id}
               onClick={() => setSelectedProject(project)}
-              className="group cursor-pointer relative rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(245,158,11,0.1)] flex flex-col h-full overflow-hidden"
+              className="portfolio-card opacity-0 group cursor-pointer relative bg-white border border-gray-100 rounded-3xl p-4 hover:shadow-[0_20px_40px_rgba(79,70,229,0.08)] transition-all duration-500 hover:-translate-y-2 flex flex-col h-full overflow-hidden"
             >
               {/* Project Image Container */}
-              <div className="w-full aspect-video overflow-hidden border-b border-slate-800 bg-slate-950 relative">
-                <img 
-                  src={project.image} 
-                  alt={project.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              <div className="w-full aspect-video overflow-hidden rounded-2xl bg-gray-50 relative mb-6">
+                <img
+                  src={project.image}
+                  alt={project.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                   loading="lazy"
                 />
+                {/* Subtle overlay gradient on hover */}
+                <div className="absolute inset-0 bg-indigo-900/0 group-hover:bg-indigo-900/10 transition-colors duration-500"></div>
               </div>
 
-              {/* Card Content Wrapper */}
-              <div className="p-6 flex flex-col flex-grow">
-                <div className="text-xs font-mono text-emerald-400 mb-2 uppercase tracking-wider">
+              {/* Card Content */}
+              <div className="px-4 pb-4 flex flex-col flex-grow">
+                <div className="w-max bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest mb-4">
                   {project.category}
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
+
+                <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-indigo-600 transition-colors duration-300">
                   {project.title}
                 </h3>
-                <p className="text-neutral-400 text-sm mb-6 leading-relaxed flex-grow">
+
+                <p className="text-gray-500 text-sm mb-6 leading-relaxed flex-grow">
                   {project.shortDescription}
                 </p>
-                
+
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   {project.tags.slice(0, 3).map((tag, index) => (
-                    <span key={index} className="text-xs bg-slate-950 text-neutral-300 px-3 py-1 rounded-full border border-slate-800">
+                    <span key={index} className="text-xs bg-gray-50 text-gray-600 px-3 py-1 rounded-full border border-gray-100">
                       {tag}
                     </span>
                   ))}
                 </div>
 
                 {/* View Details Hint */}
-                <div className="pt-4 border-t border-slate-800 flex items-center text-emerald-500 text-sm font-semibold group-hover:translate-x-2 transition-transform duration-300 mt-auto">
-                  View Details 
+                <div className="pt-4 border-t border-gray-100 flex items-center text-indigo-600 text-sm font-semibold group-hover:translate-x-2 transition-transform duration-300 mt-auto">
+                  View Details
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
                 </div>
               </div>
@@ -77,56 +133,56 @@ export default function Portfolio() {
 
       {/* --- MODAL OVERLAY --- */}
       {selectedProject && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/80 backdrop-blur-md"
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-gray-900/40 backdrop-blur-md transition-all duration-300"
           onClick={() => setSelectedProject(null)}
         >
-          <div 
-            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col"
+          <div
+            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-gray-100 rounded-3xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            
+
             {/* Close Button */}
-            <button 
+            <button
               onClick={() => setSelectedProject(null)}
-              className="absolute top-4 right-4 w-10 h-10 bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 text-neutral-400 hover:text-white rounded-full flex items-center justify-center transition-colors z-20 border border-slate-800"
+              className="absolute top-4 right-4 w-10 h-10 bg-white/80 backdrop-blur-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 rounded-full flex items-center justify-center transition-colors z-20 border border-gray-200 shadow-sm"
               aria-label="Close modal"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
 
             {/* Large Modal Image Header */}
-            <div className="w-full aspect-video sm:aspect-[21/9] overflow-hidden bg-slate-900 border-b border-slate-800 relative">
-              <img 
-                src={selectedProject.image} 
-                alt={selectedProject.title} 
+            <div className="w-full aspect-video sm:aspect-[21/9] overflow-hidden bg-gray-50 relative">
+              <img
+                src={selectedProject.image}
+                alt={selectedProject.title}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent opacity-60"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent opacity-90"></div>
             </div>
 
             {/* Modal Body Content */}
-            <div className="p-6 sm:p-10">
-              <span className="text-emerald-400 font-mono text-sm tracking-widest uppercase mb-2 block">
+            <div className="p-8 sm:p-12 -mt-20 relative z-10">
+              <span className="w-max bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-4 block">
                 {selectedProject.category}
               </span>
-              <h2 className="text-3xl font-bold text-white mb-6">
+              <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-6 tracking-tight">
                 {selectedProject.title}
               </h2>
-              
-              <div className="prose prose-invert max-w-none">
-                <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-8">
+
+              <div className="max-w-none">
+                <p className="text-gray-600 text-base sm:text-lg leading-relaxed mb-10">
                   {selectedProject.longDescription}
                 </p>
 
-                <div className="grid sm:grid-cols-2 gap-8 mb-8">
+                <div className="grid sm:grid-cols-2 gap-10 mb-10">
                   {/* Features List */}
                   <div>
-                    <h4 className="text-white font-semibold mb-4 text-base border-b border-slate-800 pb-2">Key Features</h4>
-                    <ul className="space-y-3">
+                    <h4 className="text-gray-900 font-bold mb-5 text-base border-b border-gray-100 pb-3">Key Features</h4>
+                    <ul className="space-y-4">
                       {selectedProject.features.map((feature, i) => (
-                        <li key={i} className="flex items-start text-neutral-400 text-sm">
-                          <svg className="w-4 h-4 text-emerald-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                        <li key={i} className="flex items-start text-gray-600 text-sm">
+                          <svg className="w-5 h-5 text-indigo-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
                           {feature}
                         </li>
                       ))}
@@ -135,10 +191,10 @@ export default function Portfolio() {
 
                   {/* Tech Stack */}
                   <div>
-                    <h4 className="text-white font-semibold mb-4 text-base border-b border-slate-800 pb-2">Tech Stack</h4>
+                    <h4 className="text-gray-900 font-bold mb-5 text-base border-b border-gray-100 pb-3">Tech Stack</h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedProject.tags.map((tag, i) => (
-                        <span key={i} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-medium">
+                        <span key={i} className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-medium">
                           {tag}
                         </span>
                       ))}
@@ -148,17 +204,17 @@ export default function Portfolio() {
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-6 border-t border-slate-800 flex flex-wrap gap-4 mt-auto">
-                <a 
+              <div className="pt-8 border-t border-gray-100 flex flex-wrap gap-4 mt-auto">
+                <a
                   href={selectedProject.link}
-                  className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-600 text-black font-bold hover:from-emerald-300 hover:to-emerald-500 transition-all shadow-lg shadow-emerald-500/20 flex items-center text-sm"
+                  className="px-6 py-3.5 rounded-xl bg-gray-900 text-white font-semibold hover:bg-black transition-all shadow-lg shadow-gray-900/20 flex items-center text-sm"
                 >
                   View Live Project
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                 </a>
-                <button 
+                <button
                   onClick={() => setSelectedProject(null)}
-                  className="px-5 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors text-sm"
+                  className="px-6 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-900 font-semibold hover:bg-gray-50 transition-colors text-sm"
                 >
                   Back to Portfolio
                 </button>
@@ -166,7 +222,7 @@ export default function Portfolio() {
             </div>
 
           </div>
-         </div>
+        </div>
       )}
     </section>
   );
