@@ -4,10 +4,9 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false); // Change to true if you want the mobile dropdown open by default
 
   const navLinks = [
-    { name: 'Toolkit', href: '#toolkit' },
-    { name: 'Methods', href: '#methods' },
-    { name: 'Showcase', href: '#showcase' },
-    { name: 'About', href: '#about' },
+    { name: 'Services', href: '#services' },
+    { name: 'Works', href: '#works' },
+    { name: 'Feedback', href: '#feedback' },
   ];
 
   return (
