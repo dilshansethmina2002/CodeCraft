@@ -7,6 +7,7 @@ import Portfolio from './sections/Portfolio';
 import Contact from './sections/Contact';
 import Footer from './components/Footer';
 import Feedback from './sections/Feedback';
+import WhatsAppButton from './components/WhatsAppButton';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +16,7 @@ function App() {
     // Adjust the timeout to match your Intro.jsx animation duration
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 2500); 
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, []);
@@ -26,11 +27,13 @@ function App() {
       {isLoading && <Intro />}
 
       {/* Main app content with a smooth fade-in transition */}
-      <div 
-        className={`min-h-screen bg-slate-900 text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 transition-opacity duration-1000 ${
-          isLoading ? 'opacity-0 h-screen overflow-hidden' : 'opacity-100'
-        }`}
+      <div
+        className={`min-h-screen bg-slate-900 text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 transition-opacity duration-1000 ${isLoading ? 'opacity-0 h-screen overflow-hidden' : 'opacity-100'
+          }`}
       >
+
+        {/* Floating WhatsApp Button */}
+        <WhatsAppButton />
         <Navbar />
 
         <main>
